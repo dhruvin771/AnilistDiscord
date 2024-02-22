@@ -5,7 +5,6 @@ import logging
 import asyncio
 import psutil
 from dotenv import load_dotenv
-from anilist import AnilistDiscord
 from handler import DiscordHandler
 from keep_alive import keep_alive
 from AnilistPython import Anilist
@@ -138,22 +137,63 @@ async def stats(ctx):
 async def anime(ctx):
     """Search Anime"""
     message_content = ctx.message.content[len("/anime") + 1:]
-    anime_embed = anilist.get_anime(anime_name=message_content)
-    print(anime_embed)
-    embed = discord.Embed()
-    embed.title = anime_embed['name_english']
-    embed.description = anime_embed['desc']
-    embed.color = 0xA0DB8E
-    embed.set_image(url=anime_embed['banner_image'])
-    embed.set_thumbnail(url=anime_embed['cover_image'])
+    try:
+        anime_dict = anilist.get_anime(anime_name=message_content)
+    except:
+        return await ctx.send("An error occurred while fetching anime information.")
+    print(anime_dict)
 
-    if anime_embed == -1:
-        await ctx.send(
-            "Anime not found! Please try again or use a different name. (romaji preferred)"
-        )
-    else:
-        await ctx.send(embed=embed)
+    eng_name = anime_dict.get("name_english", "")
+    jap_name = anime_dict.get("name_romaji", "")
+    desc = anime_dict.get("desc", "")
+    starting_time = anime_dict.get("starting_time", "")
+    ending_time = anime_dict.get("ending_time", "")
+    cover_image = anime_dict.get("cover_image", "")
+    airing_format = anime_dict.get("airing_format", "")
+    airing_status = anime_dict.get("airing_status", "")
+    airing_ep = anime_dict.get("airing_episodes", "")
+    season = anime_dict.get("season", "")
+    genres = anime_dict.get("genres", [])
+    next_airing_ep = anime_dict.get("next_airing_ep", {})
+    anime_link = f'https://anilist.co/anime/{anilist.get_anime_id(message_content)}/'
 
+    genres_new = ', '.join(genres)
+
+    try:
+        initial_time = next_airing_ep.get('timeUntilAiring', 0)
+        mins, secs = divmod(initial_time, 60)
+        hours, mins = divmod(mins, 60)
+        days, hours = divmod(hours, 24)
+        timer = f'{days} days {hours} hours {mins} mins {secs} secs'
+        next_ep_num = next_airing_ep.get('episode', 0)
+        next_ep_string = f'Episode {next_ep_num} is releasing in {timer}!\n\n[{jap_name} AniList Page]({anime_link})'
+
+    except:
+        next_ep_string = f"This anime's release date has not been confirmed!\n\n[{jap_name} AniList Page]({anime_link})"
+
+    if desc:
+        desc = desc.strip().replace('<br>', '').replace('<i>', '').replace('</i>', '')
+
+    anime_embed = discord.Embed(title=jap_name, description=eng_name, color=0xA0DB8E)
+    anime_embed.set_image(url=cover_image)
+    anime_embed.add_field(name="Synopsis", value=desc, inline=False)
+    anime_embed.add_field(name="Airing Date", value=starting_time, inline=True)
+    anime_embed.add_field(name="Ending Date", value=ending_time, inline=True)
+    anime_embed.add_field(name="Season", value=season, inline=True)
+
+    try:
+        episodes = int(airing_ep)
+        airing_info = f"{airing_format} ({airing_ep} {'episodes' if episodes > 1 else 'episode'})"
+
+    except:
+        airing_info = airing_format
+
+    anime_embed.add_field(name="Airing Format", value=airing_info, inline=True)
+    anime_embed.add_field(name="Airing Status", value=airing_status, inline=True)
+    anime_embed.add_field(name="Genres", value=genres_new, inline=True)
+    anime_embed.add_field(name="Next Episode ~", value=next_ep_string, inline=False)
+
+    await ctx.send(embed=anime_embed)
 
 mangaList = [
     'name_romaji', 'name_english', 'starting_time', 'ending_time',
