@@ -8,8 +8,10 @@ from dotenv import load_dotenv
 from anilist import AnilistDiscord
 from handler import DiscordHandler
 from keep_alive import keep_alive
+from AnilistPython import Anilist
 
 load_dotenv()
+anilist = Anilist()
 
 intents = discord.Intents.default()
 intents.members = True
@@ -74,34 +76,28 @@ async def logs(ctx, option=None):
         await ctx.send(file=file)
 
 
-@bot.command()
+@bot.command(name="purge")
 async def purge(ctx, amount=1000):
     """Purge Server messages."""
     note = "Messages purged."
-    channel_id = int(os.getenv("channelId"))
-    if ctx.channel.id == channel_id:
-        await ctx.message.delete()
-        await ctx.channel.purge(limit=amount)
-        message = await ctx.send(
+    await ctx.message.delete()
+    await ctx.channel.purge(limit=amount)
+    message = await ctx.send(
             embed=discord.Embed(description=note, colour=discord.Colour.orange()))
-        await asyncio.sleep(10)
-        await message.delete()
-    else:
-        pass
+    await asyncio.sleep(10)
+    await message.delete()
 
 
-@bot.command()
+@bot.command(name="clear")
 async def clear(ctx):
     """Clear Server Messages"""
     guild = ctx.guild
-    channel_id = int(os.getenv("channelId"))
 
-    if ctx.channel.id == channel_id:
-        selected_message = None
-        async for message in ctx.channel.history(limit=None):
-            if message.author == ctx.author:
-                selected_message = message
-                break
+    selected_message = None
+    async for message in ctx.channel.history(limit=None):
+        if message.author == ctx.author:
+            selected_message = message
+            break
 
         if selected_message:
             await selected_message.delete()
@@ -117,7 +113,7 @@ async def clear(ctx):
                     pass
                 except discord.HTTPException:
                     await asyncio.sleep(1)
-                    continue
+                    continue        
 
     embed = discord.Embed(description="All messages have been cleared.",
                           colour=discord.Colour.greyple())
@@ -125,7 +121,7 @@ async def clear(ctx):
     await asyncio.sleep(10)
     await message.delete()
 
-@bot.command()
+@bot.command(name="stats")
 async def stats(ctx):
     """System stats"""
     cpu_usage = psutil.cpu_percent()
@@ -138,17 +134,25 @@ async def stats(ctx):
     await message.delete()
 
 # Search anime
-@bot.command()
+@bot.command(name="anime")
 async def anime(ctx):
     """Search Anime"""
     message_content = ctx.message.content[len("/anime") + 1:]
-    anime_embed = AnilistDiscord.get_anime_discord(anime_name=message_content)
+    anime_embed = anilist.get_anime(anime_name=message_content)
+    print(anime_embed)
+    embed = discord.Embed()
+    embed.title = anime_embed['name_english']
+    embed.description = anime_embed['desc']
+    embed.color = 0xA0DB8E
+    embed.set_image(url=anime_embed['banner_image'])
+    embed.set_thumbnail(url=anime_embed['cover_image'])
+
     if anime_embed == -1:
         await ctx.send(
             "Anime not found! Please try again or use a different name. (romaji preferred)"
         )
     else:
-        await ctx.send(embed=anime_embed)
+        await ctx.send(embed=embed)
 
 
 mangaList = [
@@ -158,11 +162,11 @@ mangaList = [
 ]
 
 
-@bot.command()
+@bot.command(name="manga")
 async def manga(ctx):
     """Search Manga"""
     message_content = ctx.message.content[len("/manga") + 1:]
-    mangaInfo = AnilistDiscord.get_manga_info(message_content)
+    mangaInfo = anilist.get_manga(message_content)
     print(f'manga {mangaInfo}')
     if mangaInfo == '':
         await ctx.send(
