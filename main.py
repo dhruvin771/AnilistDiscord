@@ -141,7 +141,6 @@ async def anime(ctx):
         anime_dict = anilist.get_anime(anime_name=message_content)
     except:
         return await ctx.send("An error occurred while fetching anime information.")
-    print(anime_dict)
 
     eng_name = anime_dict.get("name_english", "")
     jap_name = anime_dict.get("name_romaji", "")
@@ -149,6 +148,7 @@ async def anime(ctx):
     starting_time = anime_dict.get("starting_time", "")
     ending_time = anime_dict.get("ending_time", "")
     cover_image = anime_dict.get("cover_image", "")
+    banner_image = anime_dict.get("banner_image", "")
     airing_format = anime_dict.get("airing_format", "")
     airing_status = anime_dict.get("airing_status", "")
     airing_ep = anime_dict.get("airing_episodes", "")
@@ -171,12 +171,20 @@ async def anime(ctx):
     except:
         next_ep_string = f"This anime's release date has not been confirmed!\n\n[{jap_name} AniList Page]({anime_link})"
 
+    anime_embed = discord.Embed(title=jap_name, description=eng_name, color=0xA0DB8E)
+    anime_embed.set_image(url=banner_image)
+    anime_embed.set_thumbnail(url=cover_image)  
+    
     if desc:
         desc = desc.strip().replace('<br>', '').replace('<i>', '').replace('</i>', '')
+        max_words = 200
+        if len(desc) > max_words:
+            truncated_desc = desc[:max_words] + '...'
+            truncated_desc += f'\n[Show more]({anime_link})'    
+            anime_embed.add_field(name="Description", value=truncated_desc, inline=False)
+        else:
+            anime_embed.add_field(name="Description", value=desc, inline=False)
 
-    anime_embed = discord.Embed(title=jap_name, description=eng_name, color=0xA0DB8E)
-    anime_embed.set_image(url=cover_image)
-    anime_embed.add_field(name="Synopsis", value=desc, inline=False)
     anime_embed.add_field(name="Airing Date", value=starting_time, inline=True)
     anime_embed.add_field(name="Ending Date", value=ending_time, inline=True)
     anime_embed.add_field(name="Season", value=season, inline=True)
@@ -206,25 +214,30 @@ mangaList = [
 async def manga(ctx):
     """Search Manga"""
     message_content = ctx.message.content[len("/manga") + 1:]
-    mangaInfo = anilist.get_manga(message_content)
-    print(f'manga {mangaInfo}')
-    if mangaInfo == '':
-        await ctx.send(
-            "Manga not found! Please try again or use a different name. (romaji preferred)"
-        )
-    else:
-        embed = discord.Embed()
-        embed.title = mangaInfo['name_romaji']
-        embed.description = mangaInfo['name_english']
-        embed.color = 0xA0DB8E
-        embed.set_image(url=mangaInfo['banner_image'])
-        embed.set_thumbnail(url=mangaInfo['cover_image'])
+    manga_info = anilist.get_manga(message_content)
 
-        for key in mangaList:
-            value = mangaInfo[key]
-            if value:
-                embed.add_field(name=key, value=value, inline=False)
-        await ctx.send(embed=embed)
+    if not manga_info:
+        return await ctx.send("Manga not found! Please try again or use a different name. (romaji preferred)")
+
+    embed = discord.Embed(title=manga_info['name_romaji'], description=manga_info['name_english'], color=0xA0DB8E)
+    embed.set_image(url=manga_info['banner_image'])
+    embed.set_thumbnail(url=manga_info['cover_image'])
+
+    embed.add_field(name="Starting Time", value=manga_info['starting_time'], inline=True)
+    embed.add_field(name="Ending Time", value=manga_info['ending_time'], inline=True)
+    embed.add_field(name="Release Format", value=manga_info['release_format'], inline=True)
+    embed.add_field(name="Release Status", value=manga_info['release_status'], inline=True)
+    
+    desc = manga_info['desc']
+    if desc:
+        desc = desc.strip().replace('<br>', '').replace('<i>', '').replace('</i>', '')
+        embed.add_field(name="Description", value=desc, inline=False)
+
+    genres = ', '.join(manga_info['genres'])
+    if genres:
+        embed.add_field(name="Genres", value=genres, inline=False)
+
+    await ctx.send(embed=embed)
 
 keep_alive()
 
